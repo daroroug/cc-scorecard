@@ -1,0 +1,49 @@
+{
+  "name": "cc-scorecard",
+  "version": "0.1.0",
+  "description": "Grade your Claude Code sessions — 6-dimension quality scorecard with HTML report",
+  "type": "module",
+  "bin": {
+    "cc-scorecard": "./index.mjs"
+  },
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./lib/transcript-parser": "./lib/transcript-parser.mjs",
+    "./lib/metrics-engine": "./lib/metrics-engine.mjs",
+    "./lib/grading": "./lib/grading.mjs",
+    "./lib/html-renderer": "./lib/html-renderer.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "lib/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "scorecard": "node index.mjs"
+  },
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai-coding",
+    "session-analytics",
+    "token-tracking",
+    "cost-optimization",
+    "developer-tools",
+    "code-quality"
+  ],
+  "author": "Dan Arouag",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daroroug/cc-scorecard"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.0"
+  }
+}
