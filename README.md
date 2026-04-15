@@ -8,34 +8,37 @@
 
 ---
 
-Every Claude Code session writes a JSONL transcript. Nobody reads them. **cc-scorecard** does — it parses your transcripts, scores your session across 6 quality dimensions, and tells you exactly what went well and what burned money.
+Every Claude Code session writes a JSONL transcript to `~/.claude/projects/`. Nobody reads them. **cc-scorecard** does — it parses your transcripts, computes a letter grade across 6 quality dimensions, and generates a visual HTML report you can share.
 
-## Example Output
+## Example Report
+
+<p align="center">
+  <img src="docs/scorecard-example.png" alt="Session Scorecard HTML Report" width="700">
+</p>
+
+The HTML report includes an overall grade circle, 6 dimension score bars, key session metrics, and actionable insights — all in a self-contained file with no external dependencies.
+
+### Terminal Output
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  SESSION SCORECARD — Grade: B (74/100)
+  SESSION SCORECARD — Grade: A (88/100)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Session:  abc12345...
-  Duration: 42m
-  Cost:     $2.84
-  Turns:    32
-  Tools:    48
+  Session:  d07095f1...
+  Duration: 1h 12m
+  Cost:     $8.43
+  Turns:    28
+  Tools:    35
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Cost Efficiency    ████████████████░░░░  82/100  $2.84 total
-  Cache Health       ███████████████░░░░░  75/100  72% hit ratio
-  Tool Discipline    █████████████████░░░  88/100  3.5:1 R:E ratio
-  Stuck/Thrash       ██████████████████░░  90/100  0 stuck periods
-  Quality Signals    ███████████████████░  95/100  0 hallucinations
-  Session Pacing     █████████████████░░░  85/100  1 idle gap
+  Cost Efficiency    █████████████░░░░░░░  69/100  $8.43 total
+  Cache Health       ████████████████░░░░  81/100  88% hit ratio
+  Tool Discipline    ██████████████████░░  90/100  4.2:1 R:E ratio
+  Stuck/Thrash       ████████████████████ 100/100  0 stuck periods
+  Quality Signals    ████████████████████ 100/100  0 hallucinations
+  Session Pacing     ████████████████████ 100/100  0 idle gaps
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
-
-It also generates a **beautiful HTML report** you can share with your team:
-
-<!-- TODO: Add screenshot of HTML report -->
-<!-- ![HTML Report](docs/screenshot.png) -->
 
 ## Quick Start
 
@@ -46,44 +49,55 @@ npx cc-scorecard
 # Analyze a specific transcript file
 npx cc-scorecard --file ~/.claude/projects/-Users-you-myproject/session-id.jsonl
 
-# Get JSON output (pipe to jq, scripts, dashboards)
+# JSON output for scripting
 npx cc-scorecard --json
 ```
 
-That's it. No config. No API keys. No setup.
+No config. No API keys. No setup.
 
-## What It Measures
+## The 6 Dimensions
 
-### The 6 Dimensions
-
-| Dimension | Weight | What It Catches | Why It Matters |
-|-----------|--------|-----------------|----------------|
-| **Cost Efficiency** | 20% | High $/turn, wasteful token usage | Opus sessions at $0.50+/turn are burning money |
-| **Cache Health** | 20% | Low cache hit ratio, idle gaps busting TTL | Every 5-min pause costs you a full context re-send |
-| **Tool Discipline** | 20% | Low Read:Edit ratio, blind edits | Sessions with R:E > 3:1 have far fewer hallucinations |
+| Dimension | Weight | What It Measures | Why It Matters |
+|-----------|--------|------------------|----------------|
+| **Cost Efficiency** | 20% | $/turn normalized for model pricing | Catches runaway sessions before they drain quota |
+| **Cache Health** | 20% | Cache hit ratio + idle gap detection | Every 5-min pause resets the cache — you pay for full context re-send |
+| **Tool Discipline** | 20% | Read:Edit ratio, blind edit detection | The #1 predictor of session quality (see below) |
 | **Stuck/Thrash** | 15% | Consecutive failures, retry loops | Stuck loops waste 15-20% of typical session tokens |
-| **Quality Signals** | 15% | Failed Read then Edit to same path | The #1 hallucination pattern: editing files that don't exist |
-| **Session Pacing** | 10% | Long idle gaps, burst periods | Cache TTL is 5 minutes — every pause costs real money |
+| **Quality Signals** | 15% | Hallucination pattern detection | Catches the "failed Read → Edit same path" pattern |
+| **Session Pacing** | 10% | Idle gaps and burst analysis | Uneven pacing kills cache efficiency |
+
+### The Key Insight: Read:Edit Ratio
+
+The single most predictive signal for session quality:
+
+| R:E Ratio | Meaning | Quality Impact |
+|-----------|---------|----------------|
+| **> 3:1** | Agent reads extensively before editing | Significantly fewer hallucinations |
+| 2:1 – 3:1 | Reasonable discipline | Some blind spots |
+| 1:1 – 2:1 | Editing as much as reading | Elevated risk |
+| **< 1:1** | Editing more than reading | Agent is guessing |
+
+This metric emerged from analyzing the Opus 4.6 reasoning regression, where degraded sessions showed a characteristic R:E ratio collapse before quality visibly dropped.
 
 ### Grading Scale
 
-| Grade | Score | What It Means |
-|-------|-------|---------------|
-| **A** | ≥ 85 | Excellent — efficient, disciplined, no issues |
-| **B** | ≥ 70 | Good — minor inefficiencies, mostly clean |
-| **C** | ≥ 55 | Fair — notable waste or quality issues to address |
-| **D** | ≥ 40 | Poor — significant problems dragging down quality |
-| **F** | < 40 | Failing — major issues, session was wasteful or risky |
+| Grade | Score | Meaning |
+|-------|-------|---------|
+| **A** | ≥ 85 | Excellent — efficient, disciplined, clean |
+| **B** | ≥ 70 | Good — minor inefficiencies |
+| **C** | ≥ 55 | Fair — notable waste or quality issues |
+| **D** | ≥ 40 | Poor — significant problems |
+| **F** | < 40 | Failing — major issues across dimensions |
 
 ## How It Works
 
 ```
-~/.claude/projects/<hash>/<session>.jsonl    ← Every CC session writes this
+~/.claude/projects/<hash>/<session>.jsonl    ← Already exists on your machine
          │
          ▼
-   cc-scorecard analyze                      ← Parses token usage, tool calls, timing
+   cc-scorecard                              ← Reads token usage, tool calls, timing
          │
-         ├── Cost: token counts × pricing
+         ├── Cost: token counts × model pricing
          ├── Cache: cache_read / (cache_read + cache_creation)
          ├── Tools: Read:Edit ratio, blind edit detection
          ├── Stuck: consecutive failure runs, retry fingerprints
@@ -91,24 +105,10 @@ That's it. No config. No API keys. No setup.
          └── Pacing: idle gap detection, burst analysis
          │
          ▼
-   Grade: B (74/100)                         ← Weighted composite
-   + HTML report                             ← Opens in browser
+   HTML Report + Terminal Summary + JSON
 ```
 
-**Zero dependencies.** Pure Node.js built-ins (`fs`, `path`, `os`). No `better-sqlite3`, no API calls, no external services. Reads files that already exist on your machine.
-
-## The Key Insight: Read:Edit Ratio
-
-The single most predictive metric for session quality is the **Read:Edit ratio** — how many files the agent reads before it edits.
-
-| R:E Ratio | What It Means | Quality Impact |
-|-----------|---------------|----------------|
-| > 3:1 | Agent reads extensively before editing | Significantly fewer hallucinations |
-| 2:1 – 3:1 | Reasonable discipline | Some blind spots |
-| 1:1 – 2:1 | Editing as much as reading | Elevated hallucination risk |
-| < 1:1 | Editing more than reading | High risk — agent is guessing |
-
-This metric emerged from analyzing the [Opus 4.6 reasoning regression](https://github.com/daroroug/rarix/blob/main/docs/claude-degradation/claude-code-degradation-remedy-package-public.html) (Feb-Mar 2026), where degraded sessions showed a characteristic R:E ratio collapse before quality visibly dropped.
+**Zero dependencies.** Pure Node.js built-ins. No databases, no API calls, no external services.
 
 ## CLI Reference
 
@@ -116,50 +116,28 @@ This metric emerged from analyzing the [Opus 4.6 reasoning regression](https://g
 |------|-------------|
 | `--file <path>` | Analyze a specific JSONL transcript |
 | `--session <id>` | Find transcript by session ID (prefix match) |
-| `--project <dir>` | Override project directory for auto-detection |
-| `--json` | Output JSON to stdout (for scripting) |
-| `--html` | Generate HTML report and open in browser (default) |
+| `--project <dir>` | Override project directory |
+| `--json` | JSON output to stdout |
+| `--html` | Generate HTML report (default) |
 
-## JSON Output
+### JSON Output
 
 ```bash
 npx cc-scorecard --json | jq '.overall'
-```
+# { "score": 88, "grade": "A" }
 
-```json
-{
-  "score": 74,
-  "grade": "B"
-}
-```
-
-Full output includes all 6 dimensions with details:
-
-```bash
-npx cc-scorecard --json | jq '.cacheHealth'
-```
-
-```json
-{
-  "score": 75,
-  "details": {
-    "hitRatio": 0.72,
-    "cacheRead": 50000,
-    "cacheCreation": 20000,
-    "idleGaps": 2,
-    "cacheWasteTokens": 20000
-  }
-}
+npx cc-scorecard --json | jq '.cacheHealth.details'
+# { "hitRatio": 0.88, "cacheRead": 45000, "idleGaps": 0, ... }
 ```
 
 ## Requirements
 
 - Node.js ≥ 18
-- Claude Code JSONL transcripts (generated automatically by every Claude Code session)
+- Claude Code sessions (transcripts are created automatically)
 
 ## Background
 
-Built from production experience running multi-agent Claude Code sessions (4+ agents, 8+ hour sessions). The scoring dimensions come from real patterns observed across hundreds of sessions — specifically the signals that correlate with fewer bugs, less rework, and lower cost.
+Built from production experience running multi-agent Claude Code sessions (4 agents, 8+ hour sessions, 500+ PRs). The scoring dimensions reflect real patterns that correlate with fewer bugs, less rework, and lower cost.
 
 ## License
 
